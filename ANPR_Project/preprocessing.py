@@ -53,3 +53,16 @@ def apply_threshold(gray_image):
         return None
     _, thresh = cv2.threshold(gray_image, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
     return thresh
+
+def apply_clahe(gray_image, clip_limit=PREPROCESSING_CFG.clahe_clip_limit, tile_grid=PREPROCESSING_CFG.clahe_tile_grid):
+    """Contrast Limited Adaptive Histogram Equalization for handling harsh sunlight and shadows."""
+    if gray_image is None:
+        return None
+    clahe = cv2.createCLAHE(clipLimit=clip_limit, tileGridSize=tile_grid)
+    return clahe.apply(gray_image)
+
+def apply_bilateral_filter(image, d=PREPROCESSING_CFG.bilateral_d, sc=PREPROCESSING_CFG.bilateral_sigma_color, ss=PREPROCESSING_CFG.bilateral_sigma_space):
+    """Bilateral filter to smooth flat textures while preserving sharp plate edge boundaries."""
+    if image is None:
+        return None
+    return cv2.bilateralFilter(image, d, sc, ss)
