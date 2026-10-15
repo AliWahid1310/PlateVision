@@ -1,0 +1,21 @@
+{
+    "python.defaultInterpreterPath": "C:\\Users\\PMLS\\AppData\\Local\\Programs\\Python\\Python313\\python.exe",
+    "python.analysis.extraPaths": [
+        "C:\\Users\\PMLS\\AppData\\Local\\Programs\\Python\\Python313\\Lib\\site-packages",
+        "${workspaceFolder}/ANPR_Project"
+    ],
+    "python.autoComplete.extraPaths": [
+        "C:\\Users\\PMLS\\AppData\\Local\\Programs\\Python\\Python313\\Lib\\site-packages",
+        "${workspaceFolder}/ANPR_Project"
+    ],
+    "python.analysis.diagnosticSeverityOverrides": {
+        "reportMissingImports": "none",
+        "reportMissingModuleSource": "none"
+    },
+    "pyrefly.search_path": [
+        "C:\\Users\\PMLS\\AppData\\Local\\Programs\\Python\\Python313\\Lib\\site-packages",
+        "${workspaceFolder}/ANPR_Project"
+    ],
+    "pyrefly.disable": true,
+    "pyrefly.enabled": false
+}

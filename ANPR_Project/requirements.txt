@@ -1,0 +1,17 @@
+# ============================================
+# ANPR Project - Python Dependencies
+# ============================================
+# Install all packages with:
+#   pip install -r requirements.txt
+# ============================================
+
+opencv-python>=4.8.0
+numpy>=1.24.0
+easyocr>=1.7.0
+ultralytics>=8.0.0
+matplotlib>=3.7.0
+
+# Web API dependencies
+fastapi>=0.100.0
+uvicorn>=0.23.0
+python-multipart>=0.0.6

@@ -1,0 +1,6 @@
+[tool.pyrefly]
+search_path = [
+    "C:\\Users\\PMLS\\AppData\\Local\\Programs\\Python\\Python313\\Lib\\site-packages",
+    "ANPR_Project"
+]
+python_version = "3.13"
