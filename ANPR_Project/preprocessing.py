@@ -66,3 +66,17 @@ def apply_bilateral_filter(image, d=PREPROCESSING_CFG.bilateral_d, sc=PREPROCESS
     if image is None:
         return None
     return cv2.bilateralFilter(image, d, sc, ss)
+
+def apply_morphological_blackhat(gray_image, kernel_size=(13, 5)):
+    """Extract dark characters on bright rectangular plate backgrounds."""
+    if gray_image is None:
+        return None
+    rect_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, kernel_size)
+    return cv2.morphologyEx(gray_image, cv2.MORPH_BLACKHAT, rect_kernel)
+
+def apply_morphological_gradient(gray_image, kernel_size=(3, 3)):
+    """Computes difference between dilation and erosion of the image."""
+    if gray_image is None:
+        return None
+    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, kernel_size)
+    return cv2.morphologyEx(gray_image, cv2.MORPH_GRADIENT, kernel)
