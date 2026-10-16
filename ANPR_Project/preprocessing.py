@@ -80,3 +80,12 @@ def apply_morphological_gradient(gray_image, kernel_size=(3, 3)):
         return None
     kernel = cv2.getStructuringElement(cv2.MORPH_RECT, kernel_size)
     return cv2.morphologyEx(gray_image, cv2.MORPH_GRADIENT, kernel)
+
+def auto_canny(image, sigma=PREPROCESSING_CFG.canny_sigma):
+    """Compute Canny edge bounds automatically based on median pixel intensity."""
+    if image is None:
+        return None
+    v = np.median(image)
+    lower = int(max(0, (1.0 - sigma) * v))
+    upper = int(min(255, (1.0 + sigma) * v))
+    return cv2.Canny(image, lower, upper)
