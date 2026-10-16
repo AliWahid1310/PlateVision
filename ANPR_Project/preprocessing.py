@@ -89,3 +89,23 @@ def auto_canny(image, sigma=PREPROCESSING_CFG.canny_sigma):
     lower = int(max(0, (1.0 - sigma) * v))
     upper = int(min(255, (1.0 + sigma) * v))
     return cv2.Canny(image, lower, upper)
+
+def preprocess_pipeline(image_path: str):
+    """Runs complete preprocessing sequence and returns intermediate frames."""
+    raw = read_image(image_path)
+    if raw is None:
+        return None
+    resized = resize_image(raw)
+    gray = convert_to_grayscale(resized)
+    clahe = apply_clahe(gray)
+    blurred = apply_gaussian_blur(clahe)
+    edges = auto_canny(blurred)
+    thresh = apply_threshold(clahe)
+    return {
+        "original": resized,
+        "gray": gray,
+        "clahe": clahe,
+        "blurred": blurred,
+        "edges": edges,
+        "thresh": thresh
+    }
