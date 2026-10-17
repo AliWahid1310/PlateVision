@@ -40,3 +40,21 @@ def calculate_candidate_score(approx, image_shape):
     solidity_score = min(solidity / 0.85, 1.0)
     
     return float((aspect_score * 0.6) + (solidity_score * 0.4))
+
+def detect_plate_contours_fallback(gray_image):
+    """Fallback detector using morphological Sobel kernels when Canny contours fail."""
+    grad_x = cv2.Sobel(gray_image, ddepth=cv2.CV_32F, dx=1, dy=0, ksize=-1)
+    grad_x = np.absolute(grad_x)
+    (min_val, max_val) = (np.min(grad_x), np.max(grad_x))
+    if max_val > min_val:
+        grad_x = (255 * ((grad_x - min_val) / (max_val - min_val))).astype("uint8")
+    else:
+        grad_x = grad_x.astype("uint8")
+    
+    blurred = cv2.GaussianBlur(grad_x, (5, 5), 0)
+    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (17, 3))
+    closed = cv2.morphologyEx(blurred, cv2.MORPH_CLOSE, kernel)
+    _, thresh = cv2.threshold(closed, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)
+    
+    contours, _ = cv2.findContours(thresh.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    return sorted(contours, key=cv2.contourArea, reverse=True)[:15]
