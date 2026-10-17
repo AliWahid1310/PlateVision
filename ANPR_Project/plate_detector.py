@@ -58,3 +58,13 @@ def detect_plate_contours_fallback(gray_image):
     
     contours, _ = cv2.findContours(thresh.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     return sorted(contours, key=cv2.contourArea, reverse=True)[:15]
+
+def crop_plate_safe(image, bbox, padding=PLATE_CFG.crop_padding_px):
+    """Safely extracts plate region with boundary clamping and padding."""
+    x, y, w, h = bbox
+    img_h, img_w = image.shape[:2]
+    x1 = max(0, x - padding)
+    y1 = max(0, y - padding)
+    x2 = min(img_w, x + w + padding)
+    y2 = min(img_h, y + h + padding)
+    return image[y1:y2, x1:x2].copy(), (x1, y1, x2 - x1, y2 - y1)
