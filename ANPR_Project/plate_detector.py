@@ -68,3 +68,36 @@ def crop_plate_safe(image, bbox, padding=PLATE_CFG.crop_padding_px):
     x2 = min(img_w, x + w + padding)
     y2 = min(img_h, y + h + padding)
     return image[y1:y2, x1:x2].copy(), (x1, y1, x2 - x1, y2 - y1)
+
+def order_corner_points(pts):
+    """Sorts 4 corner points into: top-left, top-right, bottom-right, bottom-left."""
+    rect = np.zeros((4, 2), dtype="float32")
+    pts_reshaped = pts.reshape(4, 2)
+    s = pts_reshaped.sum(axis=1)
+    rect[0] = pts_reshaped[np.argmin(s)]
+    rect[2] = pts_reshaped[np.argmax(s)]
+    diff = np.diff(pts_reshaped, axis=1)
+    rect[1] = pts_reshaped[np.argmin(diff)]
+    rect[3] = pts_reshaped[np.argmax(diff)]
+    return rect
+
+def four_point_perspective_transform(image, pts):
+    """Flattens skewed/angled license plates into frontal rectangles."""
+    rect = order_corner_points(pts)
+    (tl, tr, br, bl) = rect
+    width_a = np.sqrt(((br[0] - bl[0]) ** 2) + ((br[1] - bl[1]) ** 2))
+    width_b = np.sqrt(((tr[0] - tl[0]) ** 2) + ((tr[1] - tl[1]) ** 2))
+    max_w = max(int(width_a), int(width_b))
+    height_a = np.sqrt(((tr[0] - br[0]) ** 2) + ((tr[1] - br[1]) ** 2))
+    height_b = np.sqrt(((tl[0] - bl[0]) ** 2) + ((tl[1] - bl[1]) ** 2))
+    max_h = max(int(height_a), int(height_b))
+    if max_w == 0 or max_h == 0:
+        return image
+    dst = np.array([
+        [0, 0],
+        [max_w - 1, 0],
+        [max_w - 1, max_h - 1],
+        [0, max_h - 1]
+    ], dtype="float32")
+    m = cv2.getPerspectiveTransform(rect, dst)
+    return cv2.warpPerspective(image, m, (max_w, max_h))
