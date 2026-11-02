@@ -107,6 +107,8 @@ def detect_plate(original_image, edge_image):
     contours = find_contours(edge_image)
     candidates = []
     for c in contours:
+        if cv2.contourArea(c) < 300:
+            continue
         perimeter = cv2.arcLength(c, True)
         approx = cv2.approxPolyDP(c, PLATE_CFG.approx_epsilon_coeff * perimeter, True)
         score = calculate_candidate_score(approx, original_image.shape)
