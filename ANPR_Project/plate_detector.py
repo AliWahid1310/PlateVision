@@ -101,3 +101,41 @@ def four_point_perspective_transform(image, pts):
     ], dtype="float32")
     m = cv2.getPerspectiveTransform(rect, dst)
     return cv2.warpPerspective(image, m, (max_w, max_h))
+
+def detect_plate(original_image, edge_image):
+    """Scans contours, scores candidate plates, and returns the best deskewed plate."""
+    contours = find_contours(edge_image)
+    candidates = []
+    for c in contours:
+        perimeter = cv2.arcLength(c, True)
+        approx = cv2.approxPolyDP(c, PLATE_CFG.approx_epsilon_coeff * perimeter, True)
+        score = calculate_candidate_score(approx, original_image.shape)
+        if score > 0:
+            x, y, w, h = cv2.boundingRect(approx)
+            candidates.append({"score": score, "approx": approx, "bbox": (x, y, w, h)})
+    
+    if not candidates:
+        log_warn("PLATE_DETECTOR", "No candidate found via standard contours. Attempting morphological fallback...")
+        gray = cv2.cvtColor(original_image, cv2.COLOR_BGR2GRAY) if len(original_image.shape) == 3 else original_image
+        fb_contours = detect_plate_contours_fallback(gray)
+        for c in fb_contours:
+            perimeter = cv2.arcLength(c, True)
+            approx = cv2.approxPolyDP(c, 0.03 * perimeter, True)
+            score = calculate_candidate_score(approx, original_image.shape)
+            if score > 0:
+                x, y, w, h = cv2.boundingRect(approx)
+                candidates.append({"score": score, "approx": approx, "bbox": (x, y, w, h)})
+
+    if not candidates:
+        log_warn("PLATE_DETECTOR", "No valid license plate detected.")
+        return None, None, None
+
+    candidates.sort(key=lambda item: item["score"], reverse=True)
+    best = candidates[0]
+    bbox = best["bbox"]
+    if PLATE_CFG.deskew_enabled and len(best["approx"]) == 4:
+        plate_crop = four_point_perspective_transform(original_image, best["approx"])
+    else:
+        plate_crop, bbox = crop_plate_safe(original_image, bbox)
+
+    return plate_crop, bbox, best["approx"]
