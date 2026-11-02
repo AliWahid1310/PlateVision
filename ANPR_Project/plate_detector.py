@@ -139,3 +139,25 @@ def detect_plate(original_image, edge_image):
         plate_crop, bbox = crop_plate_safe(original_image, bbox)
 
     return plate_crop, bbox, best["approx"]
+
+def draw_plate_overlay(image, bbox, plate_text="PLATE", confidence=0.0):
+    """Draws tech-styled corner brackets and glowing detection overlay."""
+    out = image.copy()
+    if bbox is None:
+        return out
+    x, y, w, h = bbox
+    color = (52, 211, 153) # Cyber Emerald
+    bracket_len = min(20, w // 4, h // 4)
+    # Corners
+    cv2.line(out, (x, y), (x + bracket_len, y), color, 2)
+    cv2.line(out, (x, y), (x, y + bracket_len), color, 2)
+    cv2.line(out, (x + w, y), (x + w - bracket_len, y), color, 2)
+    cv2.line(out, (x + w, y), (x + w, y + bracket_len), color, 2)
+    cv2.line(out, (x, y + h), (x + bracket_len, y + h), color, 2)
+    cv2.line(out, (x, y + h), (x, y + h - bracket_len), color, 2)
+    cv2.line(out, (x + w, y + h), (x + w - bracket_len, y + h), color, 2)
+    cv2.line(out, (x + w, y + h), (x + w, y + h - bracket_len), color, 2)
+    
+    label = f"{plate_text} ({confidence*100:.1f}%)" if confidence > 0 else plate_text
+    cv2.putText(out, label, (x, max(18, y - 8)), cv2.FONT_HERSHEY_SIMPLEX, 0.55, color, 2)
+    return out
