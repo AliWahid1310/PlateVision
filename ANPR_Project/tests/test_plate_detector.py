@@ -24,3 +24,13 @@ def test_crop_plate_safe_bounds():
     assert cropped.shape[0] > 0 and cropped.shape[1] > 0
     assert safe_bbox[0] == 0
     assert safe_bbox[1] == 0
+
+from plate_detector import order_corner_points, four_point_perspective_transform
+
+def test_order_corner_points():
+    unordered = np.array([[200, 200], [10, 10], [200, 10], [10, 200]], dtype="float32")
+    ordered = order_corner_points(unordered)
+    assert np.array_equal(ordered[0], [10, 10]) # Top-left
+    assert np.array_equal(ordered[1], [200, 10]) # Top-right
+    assert np.array_equal(ordered[2], [200, 200]) # Bottom-right
+    assert np.array_equal(ordered[3], [10, 200]) # Bottom-left
