@@ -51,3 +51,14 @@ def disambiguate_characters(text: str) -> str:
             p = p.replace('O', '0').replace('D', '0').replace('B', '8').replace('I', '1').replace('Z', '2')
         corrected_parts.append(p)
     return ' '.join(corrected_parts)
+
+def validate_plate_syntax(text: str):
+    """Detects regional format (Pakistani provincial/federal standards or general alphanumeric)."""
+    text_clean = re.sub(r'[^A-Z0-9]', '', text)
+    if re.match(r'^(ICT|IDL)[0-9]{1,4}$', text_clean):
+        return {"valid": True, "region": "Islamabad Capital Territory", "format": "ICT-XXXX"}
+    if re.match(r'^[A-Z]{2,3}[0-9]{1,4}$', text_clean):
+        return {"valid": True, "region": "Provincial Standard", "format": "ABC-XXXX"}
+    if len(text_clean) >= 4:
+        return {"valid": True, "region": "Standard Alphanumeric", "format": "General"}
+    return {"valid": False, "region": "Unknown", "format": "Invalid"}
