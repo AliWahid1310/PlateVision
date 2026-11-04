@@ -62,3 +62,33 @@ def validate_plate_syntax(text: str):
     if len(text_clean) >= 4:
         return {"valid": True, "region": "Standard Alphanumeric", "format": "General"}
     return {"valid": False, "region": "Unknown", "format": "Invalid"}
+
+def read_plate_text(plate_image):
+    """Multi-pass OCR reader: runs pass 1 on Otsu binary, falls back to inverted CLAHE if confidence is low."""
+    if plate_image is None or plate_image.size == 0:
+        return "", 0.0
+    reader = get_easyocr_reader()
+    if reader is None:
+        return "OCR_UNAVAILABLE", 0.0
+
+    prep1 = preprocess_plate_for_ocr(plate_image)
+    results = reader.readtext(prep1)
+    
+    best_text = ""
+    best_conf = 0.0
+    for (_, text, conf) in results:
+        if conf > best_conf:
+            best_conf = conf
+            best_text = text
+
+    # Pass 2: Inverted binary fallback
+    if best_conf < OCR_CFG.fallback_confidence:
+        prep2 = cv2.bitwise_not(prep1)
+        results2 = reader.readtext(prep2)
+        for (_, text, conf) in results2:
+            if conf > best_conf:
+                best_conf = conf
+                best_text = text
+
+    cleaned = disambiguate_characters(best_text)
+    return cleaned, float(best_conf)
