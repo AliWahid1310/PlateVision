@@ -38,3 +38,26 @@ def classify_vehicle_color(image, bbox):
             max_score = score
             detected_color = name
     return detected_color
+
+def get_optimal_device():
+    try:
+        import torch
+        if torch.cuda.is_available():
+            log_info("VEHICLE_DETECTOR", f"CUDA GPU available: {torch.cuda.get_device_name(0)}")
+            return "cuda"
+        elif hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+            return "mps"
+    except Exception:
+        pass
+    return "cpu"
+
+def load_yolo_model(model_name=VEHICLE_CFG.model_name):
+    try:
+        from ultralytics import YOLO
+        device = get_optimal_device()
+        log_info("VEHICLE_DETECTOR", f"Loading YOLO model {model_name} on device '{device}'...")
+        model = YOLO(model_name)
+        return model
+    except Exception as e:
+        log_warn("VEHICLE_DETECTOR", f"Could not load YOLO model: {e}")
+        return None
