@@ -61,3 +61,22 @@ def load_yolo_model(model_name=VEHICLE_CFG.model_name):
     except Exception as e:
         log_warn("VEHICLE_DETECTOR", f"Could not load YOLO model: {e}")
         return None
+
+def draw_vehicle_boxes(image, vehicles):
+    """Renders sleek bounding boxes with vehicle classification, confidence, and color badges."""
+    annotated = image.copy()
+    for v in vehicles:
+        x1, y1, x2, y2 = v["bbox"]
+        class_id = v.get("class_id", 2)
+        color = VEHICLE_CFG.vehicle_colors.get(class_id, (255, 100, 0))
+        cv2.rectangle(annotated, (x1, y1), (x2, y2), color, 2)
+        
+        label = f"{v['class_name']} ({v['confidence']*100:.0f}%)"
+        if v.get("color"):
+            label += f" | {v['color']}"
+            
+        (tw, th), baseline = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.45, 1)
+        badge_y = max(th + 6, y1)
+        cv2.rectangle(annotated, (x1, badge_y - th - 6), (x1 + tw + 8, badge_y + baseline), (20, 24, 33), -1)
+        cv2.putText(annotated, label, (x1 + 4, badge_y - 2), cv2.FONT_HERSHEY_SIMPLEX, 0.45, color, 1)
+    return annotated
