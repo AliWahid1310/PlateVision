@@ -80,3 +80,23 @@ def draw_vehicle_boxes(image, vehicles):
         cv2.rectangle(annotated, (x1, badge_y - th - 6), (x1 + tw + 8, badge_y + baseline), (20, 24, 33), -1)
         cv2.putText(annotated, label, (x1 + 4, badge_y - 2), cv2.FONT_HERSHEY_SIMPLEX, 0.45, color, 1)
     return annotated
+
+def detect_vehicles(model, image, confidence_threshold=VEHICLE_CFG.confidence_threshold):
+    if model is None or image is None:
+        return []
+    results = model(image, verbose=False)[0]
+    vehicles = []
+    for box in results.boxes:
+        cls_id = int(box.cls[0].item())
+        conf = float(box.conf[0].item())
+        if cls_id in VEHICLE_CFG.vehicle_classes and conf >= confidence_threshold:
+            x1, y1, x2, y2 = map(int, box.xyxy[0].tolist())
+            v_color = classify_vehicle_color(image, (x1, y1, x2, y2))
+            vehicles.append({
+                "class_id": cls_id,
+                "class_name": VEHICLE_CFG.vehicle_classes[cls_id],
+                "confidence": round(conf, 3),
+                "bbox": (x1, y1, x2, y2),
+                "color": v_color
+            })
+    return vehicles
