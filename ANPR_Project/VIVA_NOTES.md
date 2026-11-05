@@ -6,3 +6,9 @@ Using `cv2.getPerspectiveTransform()` and `cv2.warpPerspective()`, we compute a 
 
 ## 2. Why use Auto-Canny instead of static thresholds?
 Static values (e.g. 50, 150) degrade when images have uneven brightness. Auto-Canny computes thresholds relative to the image's median intensity $v$, guaranteeing optimal gradient detection across sunlight, overcast skies, and night scenes.
+
+## 3. How does YOLOv8 Object Detection work?
+YOLOv8 uses a CNN-based anchor-free backbone (modified CSPDarknet53) with C2f modules that fuse feature maps across spatial scales. It performs single-pass bounding box regression and classification simultaneously, executing at 60+ FPS on GPU.
+
+## 4. How is dominant vehicle color extracted?
+Color is determined by converting the vehicle bounding box to HSV space, masking out tire/windshield areas, and calculating color histogram coverage against calibrated ranges.
