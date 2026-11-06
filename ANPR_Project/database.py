@@ -74,3 +74,23 @@ def get_scan_records(limit=50, offset=0, search=""):
         rows = cur.execute(query, (limit, offset)).fetchall()
     conn.close()
     return [dict(r) for r in rows]
+
+def get_detection_statistics():
+    conn = get_db_connection()
+    cur = conn.cursor()
+    total_scans = cur.execute("SELECT COUNT(*) FROM scans").fetchone()[0]
+    plates_detected = cur.execute("SELECT COUNT(*) FROM scans WHERE plate_detected = 1").fetchone()[0]
+    avg_latency = cur.execute("SELECT AVG(processing_time_ms) FROM scans").fetchone()[0] or 0.0
+    
+    fleet_rows = cur.execute("SELECT vehicle_class, COUNT(*) as cnt FROM scans GROUP BY vehicle_class").fetchall()
+    fleet_distribution = {r["vehicle_class"]: r["cnt"] for r in fleet_rows}
+    
+    conn.close()
+    detection_rate = (plates_detected / total_scans * 100.0) if total_scans > 0 else 0.0
+    return {
+        "total_scans": total_scans,
+        "plates_detected": plates_detected,
+        "detection_rate_pct": round(detection_rate, 1),
+        "avg_processing_time_ms": round(avg_latency, 1),
+        "fleet_distribution": fleet_distribution
+    }
