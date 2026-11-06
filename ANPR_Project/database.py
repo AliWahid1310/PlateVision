@@ -94,3 +94,14 @@ def get_detection_statistics():
         "avg_processing_time_ms": round(avg_latency, 1),
         "fleet_distribution": fleet_distribution
     }
+
+def add_database_indices():
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_scans_timestamp ON scans(timestamp);")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_scans_plate ON scans(plate_text);")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_scans_vehicle ON scans(vehicle_class);")
+    conn.commit()
+    conn.close()
+
+add_database_indices()
