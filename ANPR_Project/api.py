@@ -55,3 +55,71 @@ def health_check():
         "device": get_optimal_device(),
         "version": "2.0.0"
     }
+
+@app.post("/api/process", response_model=ProcessResponse)
+async def process_image_endpoint(file: UploadFile = File(...)):
+    start_time = time.perf_counter()
+    contents = await file.read()
+    nparr = np.frombuffer(contents, np.uint8)
+    raw = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+    if raw is None:
+        raise HTTPException(status_code=400, detail="Invalid or unsupported image file.")
+    
+    resized = resize_image(raw)
+    gray = convert_to_grayscale(resized)
+    clahe = apply_clahe(gray)
+    blurred = apply_gaussian_blur(clahe)
+    edges = auto_canny(blurred)
+    thresh = apply_threshold(clahe)
+    
+    plate_crop, plate_bbox, approx = detect_plate(resized, edges)
+    plate_detected = plate_crop is not None
+    plate_text = ""
+    plate_conf = 0.0
+    plate_region = "Standard"
+    
+    if plate_detected:
+        plate_text, plate_conf = read_plate_text(plate_crop)
+        meta = validate_plate_syntax(plate_text)
+        plate_region = meta["region"]
+
+    vehicles = detect_vehicles(yolo_model, resized) if yolo_model else []
+    annotated = draw_vehicle_boxes(resized, vehicles)
+    if plate_detected:
+        annotated = draw_plate_overlay(annotated, plate_bbox, plate_text, plate_conf)
+
+    elapsed_ms = round((time.perf_counter() - start_time) * 1000.0, 1)
+
+    primary_v = vehicles[0] if vehicles else {}
+    record_id = insert_scan_record({
+        "timestamp": datetime.utcnow().isoformat(),
+        "plate_text": plate_text,
+        "plate_confidence": plate_conf,
+        "plate_detected": plate_detected,
+        "plate_region": plate_region,
+        "vehicle_class": primary_v.get("class_name", "Car"),
+        "vehicle_confidence": primary_v.get("confidence", 0.0),
+        "vehicle_color": primary_v.get("color", "Unknown"),
+        "processing_time_ms": elapsed_ms,
+        "image_name": file.filename
+    })
+
+    return {
+        "status": "success",
+        "scan_id": record_id,
+        "plate_text": plate_text,
+        "plate_confidence": plate_conf,
+        "plate_detected": plate_detected,
+        "plate_region": plate_region,
+        "vehicles": vehicles,
+        "vehicle_count": len(vehicles),
+        "plate_image": image_to_base64(plate_crop),
+        "annotated_image": image_to_base64(annotated),
+        "processing_steps": {
+            "gray": image_to_base64(gray),
+            "blurred": image_to_base64(blurred),
+            "edges": image_to_base64(edges),
+            "threshold": image_to_base64(thresh)
+        },
+        "processing_time_ms": elapsed_ms
+    }
