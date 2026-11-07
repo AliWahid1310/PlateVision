@@ -123,3 +123,12 @@ async def process_image_endpoint(file: UploadFile = File(...)):
         },
         "processing_time_ms": elapsed_ms
     }
+
+@app.get("/api/history")
+def get_history_endpoint(limit: int = 50, offset: int = 0, search: str = ""):
+    records = get_scan_records(limit=limit, offset=offset, search=search)
+    return {"records": records, "count": len(records)}
+
+@app.get("/api/stats", response_model=StatsResponse)
+def get_stats_endpoint():
+    return get_detection_statistics()
