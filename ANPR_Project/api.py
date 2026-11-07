@@ -132,3 +132,15 @@ def get_history_endpoint(limit: int = 50, offset: int = 0, search: str = ""):
 @app.get("/api/stats", response_model=StatsResponse)
 def get_stats_endpoint():
     return get_detection_statistics()
+
+@app.middleware("http")
+async def add_timing_headers(request, call_next):
+    t0 = time.perf_counter()
+    response = await call_next(request)
+    elapsed = (time.perf_counter() - t0) * 1000.0
+    response.headers["X-Process-Time-Ms"] = f"{elapsed:.2f}"
+    return response
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("api:app", host=API_CFG.host, port=API_CFG.port, reload=True)
