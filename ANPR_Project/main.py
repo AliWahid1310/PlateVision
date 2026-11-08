@@ -1,264 +1,120 @@
 """
-main.py — ANPR Project Entry Point
-=====================================
-This is the main file that ties everything together.
-Run this file to process all images in the input_images/ folder.
-
-USAGE:
-    python main.py                    → Process all images in input_images/
-    python main.py path/to/image.jpg  → Process a single image
-
-WORKFLOW:
-    1. Load the YOLO model (once, reused for all images)
-    2. For each input image:
-       a. Preprocess the image (grayscale, blur, edges)
-       b. Detect the number plate using contours
-       c. Run OCR on the cropped plate
-       d. Detect vehicles using YOLO
-       e. Combine all results onto one output image
-       f. Save the output and print the summary
+main.py - Unified CLI entry point for standalone ANPR processing.
 """
-
 import os
 import sys
+import time
+import argparse
 import cv2
-import glob
-
-# Import our custom modules
-from preprocessing import preprocess_image
-from plate_detector import detect_plate, save_plate
-from ocr import read_plate_text, draw_plate_text
+from logger import log_info, log_success, log_error, log_duration
+from preprocessing import (
+    read_image, resize_image, convert_to_grayscale,
+    apply_clahe, apply_gaussian_blur, auto_canny, apply_threshold
+)
+from plate_detector import detect_plate, draw_plate_overlay
+from ocr import read_plate_text, validate_plate_syntax
 from vehicle_detector import load_yolo_model, detect_vehicles, draw_vehicle_boxes
+from database import insert_scan_record
+from datetime import datetime
 
-
-# ============================================
-# Configuration
-# ============================================
-INPUT_DIR = "input_images"
 OUTPUT_DIR = "output_images"
 SAMPLE_DIR = "sample_data"
 
-# Supported image file extensions
-IMAGE_EXTENSIONS = ["*.jpg", "*.jpeg", "*.png", "*.bmp", "*.webp"]
-
-
-def get_image_paths(input_dir):
-    """
-    Get all image file paths from the input directory.
-    
-    Returns a list of file paths, or an empty list if no images found.
-    """
-    image_paths = []
-    
-    for ext in IMAGE_EXTENSIONS:
-        # glob.glob finds all files matching the pattern
-        pattern = os.path.join(input_dir, ext)
-        image_paths.extend(glob.glob(pattern))
-    
-    return sorted(image_paths)
-
-
-def process_single_image(image_path, yolo_model, output_dir, sample_dir):
-    """
-    Process a single image through the complete ANPR pipeline.
-    
-    Steps:
-    1. Preprocess the image
-    2. Detect the number plate
-    3. Run OCR on the plate
-    4. Detect vehicles with YOLO
-    5. Combine all annotations onto one output image
-    6. Save the result and return the summary
-    """
-    print("=" * 60)
-    print(f"Processing: {os.path.basename(image_path)}")
-    print("=" * 60)
-    
-    # Get the base filename (without extension) for saving outputs
-    base_name = os.path.splitext(os.path.basename(image_path))[0]
-    
-    # ------------------------------------------
-    # STEP 1: Preprocess the image
-    # ------------------------------------------
-    print("\n--- Step 1: Preprocessing ---")
-    preprocessed = preprocess_image(image_path, save_dir=output_dir)
-    
-    if preprocessed is None:
-        print("[ERROR] Preprocessing failed. Skipping this image.\n")
-        return None
-    
-    # Use the resized color image as our working image
-    working_image = preprocessed["original"].copy()
-    
-    # ------------------------------------------
-    # STEP 2: Detect the number plate
-    # ------------------------------------------
-    print("--- Step 2: Number Plate Detection ---")
-    plate_image, plate_coords, annotated = detect_plate(
-        preprocessed["original"],
-        preprocessed["edges"]
-    )
-    
-    # Save the cropped plate if found
-    plate_text = ""
-    plate_confidence = 0.0
-    
-    if plate_image is not None:
-        plate_save_path = os.path.join(sample_dir, f"{base_name}_plate.jpg")
-        save_plate(plate_image, plate_save_path)
-        
-        # ------------------------------------------
-        # STEP 3: OCR on the plate
-        # ------------------------------------------
-        print("\n--- Step 3: OCR ---")
-        plate_text, plate_confidence, raw_results = read_plate_text(plate_image)
-        
-        # Draw OCR text on the annotated image
-        if plate_text:
-            annotated = draw_plate_text(annotated, plate_text, plate_confidence, plate_coords)
-    else:
-        print("\n--- Step 3: OCR (Skipped — no plate detected) ---")
-    
-    # ------------------------------------------
-    # STEP 4: Vehicle Detection with YOLO
-    # ------------------------------------------
-    print("\n--- Step 4: Vehicle Detection ---")
-    vehicles = detect_vehicles(yolo_model, preprocessed["original"])
-    
-    # Draw vehicle boxes on the annotated image
-    # (which already has the plate rectangle and OCR text)
-    final_output = draw_vehicle_boxes(annotated, vehicles)
-    
-    # ------------------------------------------
-    # STEP 5: Save the final output
-    # ------------------------------------------
-    output_path = os.path.join(output_dir, f"{base_name}_result.jpg")
-    cv2.imwrite(output_path, final_output)
-    print(f"\n[INFO] Final output saved: {output_path}")
-    
-    # ------------------------------------------
-    # STEP 6: Print Summary
-    # ------------------------------------------
-    summary = {
-        "image": os.path.basename(image_path),
-        "vehicles": vehicles,
-        "plate_text": plate_text,
-        "plate_confidence": plate_confidence,
-        "plate_detected": plate_image is not None,
-        "output_path": output_path
-    }
-    
-    return summary
-
-
-def print_summary(summary):
-    """
-    Print a clean, readable summary of the results to the terminal.
-    """
-    print("\n" + "=" * 60)
-    print("[RESULTS SUMMARY]")
-    print("=" * 60)
-    print(f"Image: {summary['image']}")
-    print("-" * 40)
-    
-    # Vehicle results
-    if summary["vehicles"]:
-        print("\n[+] Vehicles Detected:")
-        for i, v in enumerate(summary["vehicles"], 1):
-            print(f"   {i}. {v['class_name']} (confidence: {v['confidence']:.0%})")
-    else:
-        print("\n[+] Vehicles Detected: None")
-    
-    # Plate results
-    print()
-    if summary["plate_detected"]:
-        if summary["plate_text"]:
-            print(f"[*] Number Plate: {summary['plate_text']}")
-            print(f"[*] OCR Confidence: {summary['plate_confidence']:.0%}")
-        else:
-            print("[*] Number Plate: Detected but OCR could not read text")
-    else:
-        print("[*] Number Plate: Not detected")
-    
-    print(f"\n[+] Output saved: {summary['output_path']}")
-    print("=" * 60)
-
-
-def main():
-    """
-    Main function — orchestrates the entire ANPR pipeline.
-    """
-    # Ensure UTF-8 output encoding on Windows terminals if supported
-    if hasattr(sys.stdout, 'reconfigure'):
-        try:
-            sys.stdout.reconfigure(encoding='utf-8', errors='replace')
-        except Exception:
-            pass
-
-    print("\n" + "=" * 60)
-    print("AUTOMATIC NUMBER PLATE RECOGNITION (ANPR)")
-    print("   & Basic Vehicle Detection System")
-    print("=" * 60)
-    
-    # Check if a specific image path was provided as argument
-    if len(sys.argv) > 1:
-        image_paths = [sys.argv[1]]
-        print(f"\nProcessing single image: {sys.argv[1]}")
-    else:
-        # Get all images from the input directory
-        if not os.path.exists(INPUT_DIR):
-            os.makedirs(INPUT_DIR, exist_ok=True)
-            print(f"\n[INFO] Created '{INPUT_DIR}/' directory.")
-            print(f"[INFO] Please put your vehicle images in '{INPUT_DIR}/' and run again.")
-            return
-        
-        image_paths = get_image_paths(INPUT_DIR)
-        
-        if not image_paths:
-            print(f"\n[WARNING] No images found in '{INPUT_DIR}/'")
-            print(f"[INFO] Supported formats: {', '.join(IMAGE_EXTENSIONS)}")
-            print(f"[INFO] Put your vehicle images in '{INPUT_DIR}/' and run again.")
-            return
-        
-        print(f"\nFound {len(image_paths)} image(s) in '{INPUT_DIR}/'")
-    
-    # Create output directories
+def ensure_dirs():
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     os.makedirs(SAMPLE_DIR, exist_ok=True)
-    
-    # Load YOLO model once (reused for all images)
-    print("\n--- Loading YOLO Model ---")
-    yolo_model = load_yolo_model("yolov8n.pt")
-    
-    if yolo_model is None:
-        print("[ERROR] Could not load YOLO model. Vehicle detection will be skipped.")
-    
-    # Process each image
-    all_summaries = []
-    
-    for i, image_path in enumerate(image_paths, 1):
-        print(f"\n\n{'#' * 60}")
-        print(f"  Image {i} of {len(image_paths)}")
-        print(f"{'#' * 60}")
-        
-        summary = process_single_image(image_path, yolo_model, OUTPUT_DIR, SAMPLE_DIR)
-        
-        if summary:
-            print_summary(summary)
-            all_summaries.append(summary)
-    
-    # Final overview
-    print("\n\n" + "=" * 60)
-    print("[SUCCESS] PROCESSING COMPLETE")
-    print("=" * 60)
-    print(f"Total images processed: {len(all_summaries)}/{len(image_paths)}")
-    print(f"Output directory: {OUTPUT_DIR}/")
-    print(f"Cropped plates: {SAMPLE_DIR}/")
-    print("=" * 60)
 
+def process_single_image(image_path, model=None, save_intermediates=True):
+    """Full ANPR pipeline for a single image file."""
+    ensure_dirs()
+    basename = os.path.splitext(os.path.basename(image_path))[0]
+    log_info("MAIN", f"Processing: {image_path}")
+    start = time.perf_counter()
 
-# ============================================
-# Run the program
-# ============================================
+    raw = read_image(image_path)
+    if raw is None:
+        log_error("MAIN", f"Could not read image: {image_path}")
+        return None
+
+    resized = resize_image(raw)
+    gray = convert_to_grayscale(resized)
+    enhanced = apply_clahe(gray)
+    blurred = apply_gaussian_blur(enhanced)
+    edges = auto_canny(blurred)
+    thresh = apply_threshold(enhanced)
+
+    if save_intermediates:
+        cv2.imwrite(os.path.join(OUTPUT_DIR, f"{basename}_gray.jpg"), gray)
+        cv2.imwrite(os.path.join(OUTPUT_DIR, f"{basename}_blurred.jpg"), blurred)
+        cv2.imwrite(os.path.join(OUTPUT_DIR, f"{basename}_edges.jpg"), edges)
+        cv2.imwrite(os.path.join(OUTPUT_DIR, f"{basename}_thresh.jpg"), thresh)
+
+    plate_crop, plate_bbox, approx = detect_plate(resized, edges)
+    plate_text = ""
+    plate_conf = 0.0
+    plate_region = "Unknown"
+
+    if plate_crop is not None:
+        plate_text, plate_conf = read_plate_text(plate_crop)
+        meta = validate_plate_syntax(plate_text)
+        plate_region = meta["region"]
+        cv2.imwrite(os.path.join(SAMPLE_DIR, f"{basename}_plate.jpg"), plate_crop)
+        log_success("MAIN", f"Plate: {plate_text} (confidence: {plate_conf:.2f}, region: {plate_region})")
+    else:
+        log_error("MAIN", "No license plate detected.")
+
+    vehicles = []
+    if model is not None:
+        vehicles = detect_vehicles(model, resized)
+        log_info("MAIN", f"Detected {len(vehicles)} vehicle(s)")
+
+    annotated = draw_vehicle_boxes(resized, vehicles)
+    if plate_bbox is not None:
+        annotated = draw_plate_overlay(annotated, plate_bbox, plate_text, plate_conf)
+    cv2.imwrite(os.path.join(OUTPUT_DIR, f"{basename}_result.jpg"), annotated)
+
+    elapsed_ms = round((time.perf_counter() - start) * 1000.0, 1)
+    log_info("MAIN", f"Pipeline completed in {elapsed_ms} ms")
+
+    primary_v = vehicles[0] if vehicles else {}
+    insert_scan_record({
+        "timestamp": datetime.utcnow().isoformat(),
+        "plate_text": plate_text,
+        "plate_confidence": plate_conf,
+        "plate_detected": plate_crop is not None,
+        "plate_region": plate_region,
+        "vehicle_class": primary_v.get("class_name", "Unknown"),
+        "vehicle_confidence": primary_v.get("confidence", 0.0),
+        "vehicle_color": primary_v.get("color", "Unknown"),
+        "processing_time_ms": elapsed_ms,
+        "image_name": os.path.basename(image_path)
+    })
+
+    return {
+        "plate_text": plate_text,
+        "plate_confidence": plate_conf,
+        "plate_region": plate_region,
+        "vehicles": vehicles,
+        "elapsed_ms": elapsed_ms
+    }
+
+def main():
+    parser = argparse.ArgumentParser(description="ANPR Vehicle Intelligence CLI")
+    parser.add_argument("image", nargs="?", default="input_images/sample_car.jpg", help="Path to vehicle image")
+    parser.add_argument("--no-yolo", action="store_true", help="Skip vehicle detection")
+    parser.add_argument("--batch", nargs="*", help="Process multiple images")
+    args = parser.parse_args()
+
+    model = None
+    if not args.no_yolo:
+        with log_duration("YOLO Model Loading"):
+            model = load_yolo_model()
+
+    if args.batch:
+        for img_path in args.batch:
+            process_single_image(img_path, model)
+    else:
+        process_single_image(args.image, model)
+
 if __name__ == "__main__":
     main()
