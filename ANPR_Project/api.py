@@ -144,3 +144,20 @@ async def add_timing_headers(request, call_next):
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("api:app", host=API_CFG.host, port=API_CFG.port, reload=True)
+
+from export_utils import export_to_csv, export_to_json
+from fastapi.responses import FileResponse
+
+@app.get("/api/export/csv")
+def export_csv_endpoint():
+    path = export_to_csv()
+    if path is None:
+        raise HTTPException(status_code=404, detail="No records available for export.")
+    return FileResponse(path, media_type="text/csv", filename="anpr_scan_history.csv")
+
+@app.get("/api/export/json")
+def export_json_endpoint():
+    path = export_to_json()
+    if path is None:
+        raise HTTPException(status_code=404, detail="No records available for export.")
+    return FileResponse(path, media_type="application/json", filename="anpr_scan_history.json")
