@@ -1,21 +1,22 @@
 import './globals.css';
 
 export const metadata = {
-  title: 'ANPR & Vehicle Detection AI | Modern Computer Vision',
-  description: 'Automated License Plate Recognition and Vehicle Classification System built with YOLOv8, OpenCV, and EasyOCR.',
+  title: 'ANPR Vehicle Intelligence System',
+  description: 'Automatic Number Plate Recognition and Fleet Analysis Dashboard',
 };
 
 export default function RootLayout({ children }) {
   return (
     <html lang="en">
-      <body>
-        <div className="ambient-bg">
-          <div className="ambient-blob-1" />
-          <div className="ambient-blob-2" />
-          <div className="ambient-grid" />
-        </div>
-        {children}
-      </body>
+      <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap"
+          rel="stylesheet"
+        />
+      </head>
+      <body>{children}</body>
     </html>
   );
 }
