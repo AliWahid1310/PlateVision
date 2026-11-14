@@ -40,7 +40,6 @@ ANPR_Project/
 ├── vehicle_detector.py     # Vehicle detection using YOLOv8
 ├── requirements.txt        # Python dependencies
 ├── README.md               # This file
-├── VIVA_NOTES.md           # Viva preparation Q&A
 │
 ├── input_images/           # Put your test images here
 ├── output_images/          # Results are saved here

@@ -33,3 +33,7 @@ out/
 # System
 .DS_Store
 Thumbs.db
+
+# Private Notes
+*VIVA_NOTES*
+
